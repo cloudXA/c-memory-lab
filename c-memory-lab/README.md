@@ -44,6 +44,14 @@ make test
 
 不要一天刷十课。推荐每天一课加一个小练习，每周留一天复习和重写。
 
+资料使用顺序：
+
+1. 在 [GUIDE.md](GUIDE.md) 阅读对应概念。
+2. 运行 `lessons/` 中对应实验并完成 `TRY`。
+3. 在 [WORKBOOK.md](WORKBOOK.md) 回答问题。
+4. 对照 [ANSWERS.md](ANSWERS.md) 的逐课答案和参考代码。
+5. 完成 [EXERCISES.md](EXERCISES.md)，卡住后再看 [EXERCISE_HINTS.md](EXERCISE_HINTS.md)。
+
 ## 课程地图
 
 ### A. 内存模型
