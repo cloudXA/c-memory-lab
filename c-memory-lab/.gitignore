@@ -1,4 +1,0 @@
-build/
-*.dSYM/
-examples/multi_file/app
-examples/multi_file/*.o
