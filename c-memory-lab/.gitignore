@@ -1,4 +1,6 @@
 build/
 *.dSYM/
+*.o
+.DS_Store
 examples/multi_file/app
 examples/multi_file/*.o
