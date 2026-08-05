@@ -1381,3 +1381,256 @@ free 后将 p 设为空指针；%p 可能显示为 0x0 或 (nil)；p 对象本�
 ```
 
 > 一句话总结：p 是栈上的地址变量，malloc 创建堆上的动态存储；free 销毁的是动态存储，不是变量 p，所以随后还能给 p 赋值为 NULL。
+
+---
+
+## 十一、局部变量 vs 动态内存 — 生命周期与所有权
+
+从"通过指针读写整数"的角度看，两者几乎一样；真正的区别在于：
+
+> 这块 int 内存由谁创建、能活多久、应该由谁结束生命周期。
+
+### 局部变量
+
+```c
+int a = 10;
+int *b = &a;
+```
+
+常见实现中：
+
+```text
+main 的栈帧
+
+b                              a
+┌──────────────┐               ┌──────────┐
+│    &a        │ ------------> │    10    │
+└──────────────┘               └──────────┘
+```
+
+`a` 是明确声明的 int 对象，可以通过指针修改：
+
+```c
+*b = 20;
+printf("%d\n", a); // 20
+```
+
+### 动态内存
+
+```c
+int *p = malloc(sizeof(*p));
+if (p != NULL) *p = 10;
+```
+
+常见实现中：
+
+```text
+main 的栈帧                   动态存储区域
+
+p                             动态创建的 int
+┌──────────────┐              ┌──────────┐
+│ 动态内存地址  │ -----------> │    10    │
+└──────────────┘              └──────────┘
+```
+
+从 `*b` 和 `*p` 的使用方式看：
+
+```c
+printf("%d\n", *b);
+printf("%d\n", *p);
+*b = 30;
+*p = 30;
+```
+
+没有明显区别。它们都是通过 `int *` 访问一个 `int` 对象。
+
+### 核心区别一：创建方式
+
+局部对象由声明创建并直接初始化：
+
+```c
+int a = 10;
+```
+
+动态对象由 `malloc` 申请存储，刚申请后里面的值**未初始化**：
+
+```c
+int *p = malloc(sizeof(*p));
+printf("%d\n", *p); // 错误：读取未初始化值
+```
+
+必须先写入，或使用 `calloc` 得到按字节清零的存储：
+
+```c
+int *p = calloc(1, sizeof(*p));
+```
+
+### 核心区别二：生命周期
+
+局部变量的生命周期由作用域控制：
+
+```c
+void function(void) {
+    int a = 10;
+    int *b = &a;
+    // a 在这里有效
+}
+// 离开函数后 a 的生命周期结束
+```
+
+不能把它的地址带出去继续使用：
+
+```c
+int *bad(void) {
+    int a = 10;
+    return &a;          // ✗ 返回后 a 已消亡
+}
+
+int *p = bad();
+printf("%d\n", *p);     // 未定义行为
+```
+
+动态内存的生命周期由 `malloc/free` 控制：
+
+```c
+int *create(void) {
+    int *p = malloc(sizeof(*p));
+    if (p != NULL) *p = 10;
+    return p;
+}
+```
+
+函数中的局部指针 p 生命周期结束了，但它指向的动态对象仍存在：
+
+```c
+int *number = create();
+if (number != NULL) {
+    printf("%d\n", *number); // 合法
+    free(number);
+}
+```
+
+动态对象可以比创建它的函数活得更久。
+
+### 核心区别三：释放方式
+
+局部变量**不能手动释放**：
+
+```c
+int a = 10;
+int *b = &a;
+free(b);  // ✗ 未定义行为，a 不是由 malloc 分配的
+```
+
+动态内存**需要手动释放**：
+
+```c
+int *p = malloc(sizeof(*p));
+if (p != NULL) {
+    *p = 10;
+    free(p);
+    p = NULL;
+}
+```
+
+如果忘记 `free`，会造成内存泄漏。
+
+### 核心区别四：大小能否在运行时决定
+
+普通数组大小通常在声明时确定：
+
+```c
+int values[5];
+```
+
+动态数组的元素数量可以在运行时决定：
+
+```c
+size_t count = get_count();
+int *values = malloc(count * sizeof(*values));
+```
+
+还可以用 `realloc` 调整大小：
+
+```c
+int *temporary = realloc(values, new_count * sizeof(*values));
+if (temporary != NULL) values = temporary;
+```
+
+### 通过 int * 能分辨来源吗
+
+仅看到一个 `int *pointer`，通常无法判断它指向：
+
+- 局部变量
+- 全局变量
+- 静态变量
+- 动态内存
+- 数组元素
+
+例如：
+
+```c
+void print_number(const int *pointer) {
+    printf("%d\n", *pointer);
+}
+```
+
+这些调用都可以：
+
+```c
+int local = 10;
+print_number(&local);
+
+static int static_value = 20;
+print_number(&static_value);
+
+int *dynamic = malloc(sizeof(*dynamic));
+if (dynamic != NULL) {
+    *dynamic = 30;
+    print_number(dynamic);
+    free(dynamic);
+}
+```
+
+`print_number` 只负责读取，不需要知道来源。
+
+但负责释放资源的代码必须知道来源和所有权：
+
+```c
+free(&local);  // ✗ 错误
+free(dynamic); // ✓ 正确
+```
+
+所以 C 项目中需要通过接口约定明确：
+
+> 这个指针只是借用，还是调用者负责 free？
+
+### 对比表
+
+| 特征 | `int a = 10; int *b = &a;` | `int *p = malloc(...)` |
+|---|---|---|
+| 目标类型 | `int` | `int` |
+| 能否用 `*` 读写 | 可以 | 可以 |
+| 初始值 | 已初始化为 10 | `malloc` 后未初始化 |
+| 生命周期 | 通常到所在作用域结束 | 从分配成功到 `free` |
+| 是否手动释放 | 不可以 | 必须释放 |
+| 能否跨越创建函数继续存在 | 不可以 | 可以 |
+| 大小能否运行时决定 | 通常不用于动态规模 | 可以 |
+| 常见存储区域 | 栈 | 堆 |
+
+### 最终记忆
+
+```c
+int a = 10;
+int *b = &a;
+```
+
+表示：b 借用了现有对象 a 的地址，b 不拥有 a，不能 `free(b)`。
+
+```c
+int *p = malloc(sizeof(*p));
+```
+
+表示：p 接收了新动态存储的地址，通常承担释放责任，最后需要 `free(p)`。
+
+两者指向的都可以是值为 10 的 int，区别不在数字 10，而在目标对象的生命周期和所有权。
