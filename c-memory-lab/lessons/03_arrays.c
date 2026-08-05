@@ -15,6 +15,13 @@ int main(void)
     printf("values + 1   = %p\n", (void *)(values + 1));
 
     /* TRY: 用一个 int *p 遍历数组，不允许出现 values[i]。 */
+
+    int *p = values;
+    for (size_t i = 0; i < 4; ++i) {
+        printf("values[%zu]: 地址=%p, 值=%d\n",
+               i, (void *)(p + i), *(p + i));
+    }
+
     return 0;
 }
 
