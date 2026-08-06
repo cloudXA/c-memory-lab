@@ -15,7 +15,7 @@
 ```sh
 cd /Users/derbysofti105/Documents/others/c-memory-lab
 make clean all
-./build/01_bytes
+make run LESSON=01_bytes
 ```
 
 列出课程、批量验证：
@@ -31,6 +31,8 @@ make test
 make sanitize
 make test
 ```
+
+第一次使用、单课运行、Sanitizer、LLDB 和结果判断详见 [RUNNING.md](RUNNING.md)。不确定命令时执行 `make help`。
 
 ## 学习规则
 
@@ -57,6 +59,8 @@ make test
 - [EMBEDDED_GUIDE.md](EMBEDDED_GUIDE.md)：25～46 课原理讲义
 - [EMBEDDED_WORKBOOK.md](EMBEDDED_WORKBOOK.md)：STM32 对接自测题
 - [EMBEDDED_ANSWERS.md](EMBEDDED_ANSWERS.md)：25～46 课 `TRY` 参考答案
+- [STM32_BRIDGE.md](STM32_BRIDGE.md)：C 课程与 STM32 实验的映射
+- [RUNNING.md](RUNNING.md)：编译、运行、调试和全量验证
 
 ## 课程地图
 
