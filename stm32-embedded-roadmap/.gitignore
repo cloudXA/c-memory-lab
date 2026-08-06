@@ -1,0 +1,12 @@
+build/
+Debug/
+Release/
+*.o
+*.d
+*.elf
+*.hex
+*.bin
+*.map
+*.list
+*.launch
+.DS_Store
