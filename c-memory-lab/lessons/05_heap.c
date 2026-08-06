@@ -11,9 +11,10 @@ int main(void)
         return 1;
     }
 
-    printf("指针对象：&p=%p, sizeof(p)=%zu, count*sizeof(p)=%zu, \n", (void *)&p, sizeof p, count * sizeof(*p));
+    printf("指针对象：&p=%p, sizeof(p)=%zu, count*sizeof(*p)=%zu\n",
+           (void *)&p, sizeof p, count * sizeof(*p));
     printf("动态存储：p=%p, 请求字节数=%zu\n", (void *)p, count * sizeof(*p));
-    printf("%zu\n", *&p);
+    printf("*&p 等于 p，保存的动态存储地址=%p\n", (void *)*&p);
 
     for (size_t i = 0; i < count; ++i) {
         p[i] = (int)(i + 1) * 10;
@@ -35,4 +36,4 @@ int main(void)
 // p[2]: 地址=0x100e99c78, 值=30
 // p[3]: 地址=0x100e99c7c, 值=40
 // p[4]: 地址=0x100e99c80, 值=50
-// free 后将 p 设为 0x0；p 对象本身仍然存在。
+// free 后将 p 设为空指针（%p 可能显示 0x0 或 (nil)）；p 对象本身仍存在。

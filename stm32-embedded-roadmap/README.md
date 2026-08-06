@@ -49,6 +49,7 @@ FreeRTOS
 
 - [BOARD_PROFILE.md](BOARD_PROFILE.md)：开发板、芯片和调试器档案
 - [ROADMAP.md](ROADMAP.md)：8 周学习安排
+- [T_SHAPED_PLAN.md](T_SHAPED_PLAN.md)：横向广度与 UART 纵向主线执行表
 - [FOUNDATIONS.md](FOUNDATIONS.md)：Cortex-M、启动、内存和时钟基础
 - [PERIPHERALS.md](PERIPHERALS.md)：各外设的原理、实验与排错
 - [CUBEMX_WORKFLOW.md](CUBEMX_WORKFLOW.md)：CubeMX/HAL 的正确使用方式
@@ -59,6 +60,7 @@ FreeRTOS
 - [LAB_TEMPLATE.md](LAB_TEMPLATE.md)：每次实验的记录模板
 - [WORKBOOK.md](WORKBOOK.md)：原理自测题
 - [INTERVIEW.md](INTERVIEW.md)：面试与入职检查
+- [AI_AND_EMBEDDED_NOTES.md](AI_AND_EMBEDDED_NOTES.md)：AI、嵌入式学习与职业判断的对话总结
 - [REFERENCES.md](REFERENCES.md)：官方资料阅读顺序
 
 ## 学习纪律

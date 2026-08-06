@@ -52,6 +52,12 @@ make test
 4. 对照 [ANSWERS.md](ANSWERS.md) 的逐课答案和参考代码。
 5. 完成 [EXERCISES.md](EXERCISES.md)，卡住后再看 [EXERCISE_HINTS.md](EXERCISE_HINTS.md)。
 
+完成 24 课后使用扩展资料：
+
+- [EMBEDDED_GUIDE.md](EMBEDDED_GUIDE.md)：25～46 课原理讲义
+- [EMBEDDED_WORKBOOK.md](EMBEDDED_WORKBOOK.md)：STM32 对接自测题
+- [EMBEDDED_ANSWERS.md](EMBEDDED_ANSWERS.md)：25～46 课 `TRY` 参考答案
+
 ## 课程地图
 
 ### A. 内存模型
@@ -98,6 +104,43 @@ make test
 | 23 | `volatile` 与寄存器 | 编译器为何不能缓存某些读取？ |
 | 24 | 驱动接口模拟 | 如何分离硬件、驱动和业务？ |
 
+### E. 嵌入式 C 深化
+
+| 课 | 主题 | 核心问题 |
+|---|---|---|
+| 25 | 内存段 | Flash、SRAM、`.data`、`.bss`、栈和堆如何关联？ |
+| 26 | 启动与链接 | 全局对象为何在 `main` 前已初始化？ |
+| 27 | 寄存器读改写 | 为什么 `REG |= mask` 不总是安全？ |
+| 28 | 位运算陷阱 | 整数提升、位移和掩码如何避免未定义行为？ |
+| 29 | ISR 共享状态 | `volatile` 为什么不等于同步？ |
+| 30 | DMA 生命周期 | 硬件异步访问期间缓冲区必须活多久？ |
+| 31 | 固定内存池 | 不使用 `malloc` 时如何管理有限对象？ |
+| 32 | Tick 回绕 | 毫秒计数溢出后超时判断为何仍能工作？ |
+
+### F. UART 纵向主线
+
+| 课 | 主题 | 核心问题 |
+|---|---|---|
+| 33 | 字节流 | UART 为什么没有天然消息边界？ |
+| 34 | SPSC 环形缓冲区 | ISR 与主循环如何交接字节？ |
+| 35 | 流式状态机 | 半包如何跨多次输入继续解析？ |
+| 36 | 帧编码与校验 | 如何定义可验证的二进制帧？ |
+| 37 | 错误重同步 | 噪声和坏帧之后如何找到下一帧？ |
+| 38 | DMA 数据交接 | DMA 块如何安全送入协议层？ |
+| 39 | 命令分发 | 如何用表驱动和回调隔离业务？ |
+| 40 | 超时与统计 | 如何让通信故障可观察、可恢复？ |
+
+### G. 可测试嵌入式工程
+
+| 课 | 主题 | 核心问题 |
+|---|---|---|
+| 41 | HAL 接口隔离 | 如何让业务不直接依赖 STM32 HAL？ |
+| 42 | Fake 设备 | 没有开发板时怎样测试设备行为？ |
+| 43 | 主机测试 | 纯 C 模块如何自动验证？ |
+| 44 | 断言与错误码 | 编程错误和运行错误如何区分？ |
+| 45 | 配置与日志 | 如何避免魔法数字和失控打印？ |
+| 46 | 内存预算 | 如何从 map/统计结果控制 RAM？ |
+
 ## 阶段项目
 
 项目说明见 [PROJECTS.md](PROJECTS.md)：
@@ -105,6 +148,13 @@ make test
 1. 通讯录：巩固字符串、结构体、动态数组和文件组织。
 2. 串口协议解析器：巩固环形缓冲区、状态机、校验和。
 3. 传感器终端模拟器：巩固驱动接口、回调、错误处理和分层设计。
+
+新增的 `projects/uart-device-core` 是 STM32 UART 主线的纯 C 核心，可先在 Mac 上测试，再由 STM32 中断/DMA 适配层喂入字节：
+
+```sh
+make uart-core
+./projects/uart-device-core/build/test_uart_device
+```
 
 ## LLDB 快速观察
 
@@ -126,7 +176,9 @@ memory read --format x --size 1 --count 16 &x
 quit
 ```
 
-每课概念讲解见 [GUIDE.md](GUIDE.md)，完整进度安排见 [ROADMAP.md](ROADMAP.md)，常用语法见 [CHEATSHEET.md](CHEATSHEET.md)。
+01～24 课概念讲解见 [GUIDE.md](GUIDE.md)，25～46 课见 [EMBEDDED_GUIDE.md](EMBEDDED_GUIDE.md)。完整进度安排见 [ROADMAP.md](ROADMAP.md)，常用语法见 [CHEATSHEET.md](CHEATSHEET.md)。
+
+与 STM32 路线的对应关系见 [STM32_BRIDGE.md](STM32_BRIDGE.md)。
 
 第 17 课完成后运行真实多文件示例：
 

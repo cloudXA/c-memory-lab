@@ -3,7 +3,7 @@ CFLAGS := -std=c17 -Wall -Wextra -Wpedantic -Wconversion -g -O0
 SOURCES := $(wildcard lessons/*.c)
 TARGETS := $(patsubst lessons/%.c,build/%,$(SOURCES))
 
-.PHONY: all clean sanitize address-sanitize test module-demo list
+.PHONY: all clean sanitize address-sanitize test module-demo uart-core list
 
 all: $(TARGETS)
 
@@ -27,6 +27,9 @@ test: all
 
 module-demo:
 	$(MAKE) -C examples/multi_file clean all
+
+uart-core:
+	$(MAKE) -C projects/uart-device-core clean test
 
 list:
 	@for target in $(TARGETS); do echo "$$target"; done
