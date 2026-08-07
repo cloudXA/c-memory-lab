@@ -26,6 +26,24 @@ int main(void)
     /* TRY: 画出调用 change_through_pointer 时 x 和 address 两个对象。 */
     return 0;
 }
+// main: &x=0x10000, x=42
+// change_value: &copy=0x11111
+// 按值调用后 x=42
+// change_through_pointer: &address=0x11112, address=0x10000
+// 传地址调用后 x=200
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // main: &x=0x10000, x=42
 // change_value: &copy=0x20000

@@ -40,3 +40,9 @@ int main(void)
     /* TRY: 画出 allocate_one 执行时 out、heap_number 和堆对象三层关系。 */
     return 0;
 }
+
+// x:  &x=0x10000,  x=10
+// p:  &p=0x10008,  p=0x10000,  *p=10
+// pp: &pp=0x10010, pp=0x10008, *pp=0x10000, **pp=10
+// 调用前：&heap_number=0x10018, heap_number=0x00
+// 调用后：heap_number=%p, *heap_number=%d\n
