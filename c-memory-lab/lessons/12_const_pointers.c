@@ -15,5 +15,11 @@ int main(void)
     printf("const_pointer 不能改指向，但能修改 x=%d\n", x);
 
     /* TRY: 分别尝试 *pointer_to_const = 1 和 const_pointer = &y，阅读编译错误。 */
+
+    *pointer_to_const = 1;
+    const_pointer = &y;
     return 0;
 }
+// pointer_to_const 指向的值=10
+// 它可以改指向，现在值=20
+// const_pointer 不能改指向，但能修改 x=99s

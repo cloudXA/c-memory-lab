@@ -2243,3 +2243,116 @@ change_pointer(&p, &y);
 最终总结：
 
 > 一级指针并不是只能修改"值"；它修改的是自己所指向的对象。如果所指向的对象是 int，就修改 int。如果所指向的对象本身是 int *，参数自然就是 int **，此时修改的就是一个指针变量。
+
+---
+
+## 十四、const 与指针（12_const_pointers.c）
+
+### 14.1 一条铁律：`const` 修饰「紧挨着它左边的类型」
+
+> `const` 修饰**它左边最近的类型**；若左边没有类型，则修饰右边。
+
+这个规则是**固定、可推演的**，任何声明都能套用，不需要背结论。
+
+### 14.2 先理解 `*` 表示什么
+
+```c
+int *p;
+```
+
+`*` 是一个**声明符（declarator）**，不是值。它告诉编译器：`p` 是指针。读法：
+
+```
+p        → p 本身是个变量
+*p       → 它是指针
+int *p   → 这个指针指向 int
+```
+
+`*` 代表"指针"这一层，`int` 代表"指针指向的对象"那一层。**`const` 落在哪一层，就限制哪一层。**
+
+### 14.3 两种最常见的 const 指针
+
+```c
+const int *pointer_to_const;   // 指向 const int 的指针
+int *const const_pointer;      // const 的 int 指针（指针本身 const）
+```
+
+**从右往左读：**
+
+```c
+const int *pointer_to_const:
+pointer_to_const → 指针 → 指向 const int
+const 修饰 int → 被指对象不可改
+
+int *const const_pointer:
+const_pointer → const 指针 → 指向 int
+const 修饰 * → 指针本身不可改
+```
+
+### 14.4 对照表：const 限制谁
+
+| 声明 | `const` 限制对象 | 能否改指向 | 能否改指向的值 |
+|------|----------------|:---:|:---:|
+| `const int *p` | 指向的 int | ✅ 能 | ❌ 不能 |
+| `int *const p` | 指针本身 | ❌ 不能 | ✅ 能 |
+| `const int *const p` | 两个都限制 | ❌ 不能 | ❌ 不能 |
+| `int const *p` | 指向的 int（与第 1 行等价） | ✅ 能 | ❌ 不能 |
+
+注意第 4 行 `int const *p` 与 `const int *p` **完全等价**——`const` 都挨着 `int`。
+
+### 14.5 用代码验证
+
+```c
+int x = 10, y = 20;
+const int *pointer_to_const = &x;
+int *const const_pointer = &x;
+
+pointer_to_const = &y;    // ✅ 改指向合法（const 限制 int，不是指针）
+*const_pointer = 99;      // ✅ 改值合法（const 限制指针，不是 int）
+
+*pointer_to_const = 1;    // ❌ 编译错误：pointer_to_const 指向 const int
+const_pointer = &y;       // ❌ 编译错误：const_pointer 本身是 const
+```
+
+**编译错误会指向 `=` 左边的表达式**，因为它尝试修改 `const` 保护的那个对象。报错类似：
+
+```text
+error: read-only variable is not assignable
+```
+
+### 14.6 一个小技巧：看 `const` 挨着谁
+
+去掉 `*` 和类型名，看 `const` 挨着谁：
+
+```c
+const int *pointer_to_const;    // const 挨着 int → 限制 int（被指对象）
+int *const const_pointer;       // const 挨着 *   → 限制指针（指针本身）
+```
+
+### 14.7 类比：`const` 像"贴在哪个盒子上的封条"
+
+```c
+const int *p;    // 封条贴在"int 值"这个盒子上 → 值不能改
+int *const p;    // 封条贴在"指针 p"这个盒子上 → 指向不能改
+```
+
+### 14.8 谁在改指针指向？为什么要分"能改/不能改"
+
+改指针指向是为了让**同一段代码在不同时刻操作不同的对象**：
+
+1. **遍历数组/集合**：`p++` 让指针逐个指向元素
+2. **链表跳转**：`cur = cur->next` 指向下一个节点
+3. **动态内存重分配**：`buffer = malloc(new_size)` 换一块内存
+4. **二级指针修改调用者**：函数内 `*out = malloc(...)` 改调用者指针
+5. **驱动分派/策略切换**：同一个指针按条件指向不同实现
+
+而 `int *const p` 则反其道而行——**锁死一个指针永远指向某个固定对象**，防止被意外改走。典型场景：
+
+```c
+// 嵌入式：永久绑定一个寄存器地址
+uint32_t *const REG = (uint32_t *)0x40000000;
+```
+
+### 14.9 一句话总结
+
+> `const` 修饰它**左边最近**的类型；`*` 代表"指针"层，`int` 代表"指向对象"层，`const` 落在哪一层就限制哪一层。`const int *p` 是被指对象不能改、指针能改；`int *const p` 是指针不能改、被指对象能改。
