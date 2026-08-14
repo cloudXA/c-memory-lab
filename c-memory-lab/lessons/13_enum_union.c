@@ -24,3 +24,6 @@ int main(void)
     /* TRY: 用 switch 将每个 DeviceState 转换成可读字符串。 */
     return 0;
 }
+
+// state=1, union 大小=8                
+// word=0x12345678, bytes=%02x %02x %02x %02x
