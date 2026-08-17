@@ -23,3 +23,5 @@ int main(void)
     /* TRY: 运行 cc -c 只编译，再用 cc 链接；观察 .o 文件。 */
     return 0;
 }
+// shared=3, calls=1
+// shared=7, calls=2
