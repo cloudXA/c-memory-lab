@@ -2731,3 +2731,200 @@ printf("%#010x\n", reg); // ← 只有这里"翻译"成十六进制显示
 ### 16.8 一句话总结
 
 > `uint32_t` 是 32 个开关，`BIT(n)` 造出"只有第 n 位是 1"的掩码，`|=` 开灯、`&= ~` 关灯、`^=` 翻转、`&` 查灯。这就是硬件寄存器和前端权限系统底层的同一套东西。
+
+---
+
+## 十七、函数指针与回调（15_callbacks.c）
+
+### 17.1 typedef 定义函数指针类型
+
+```c
+typedef void (*value_callback)(int value, void *context);
+```
+
+翻译：定义一个类型 `value_callback`，它是「指向函数的指针」，这种函数接收 `(int, void *)`，返回 `void`。
+
+拆解：
+
+```c
+typedef void (*value_callback)(int value, void *context);
+   │     │        │            │         │
+   │     │        │            │         └── 第二参数：void * 类型，名 context
+   │     │        │            └── 第一参数：int 类型，名 value
+   │     │        └── 类型名（别名）
+   │     └── (*...) 表示"指向函数的指针"
+   └── 返回类型 void
+```
+
+`typedef` 之后，`value_callback` 变成普通类型名，可像 `int` 一样直接声明参数：
+
+```c
+void for_each(const int *values, size_t count,
+              value_callback callback, void *context)
+```
+
+### 17.2 等价于 TS 的函数类型
+
+这行和 TypeScript 定义函数类型是**同一个概念**：
+
+```c
+// C
+typedef void (*value_callback)(int value, void *context);
+```
+
+```ts
+// TypeScript
+type ValueCallback = (value: number, context: unknown) => void;
+```
+
+| 部分 | C | TypeScript |
+|------|---|-----------|
+| 定义类型别名 | `typedef` | `type` |
+| 类型名 | `value_callback` | `ValueCallback` |
+| 函数签名 | `(*value_callback)(int, void *)` | `(value: number, context: unknown)` |
+| 返回类型 | `void` | `void` |
+| 万能指针 | `void *` | `unknown` |
+
+唯一区别：C 的函数不能直接当值传，要用**函数指针**（多一个 `*` 和括号）。`void *` 就是 C 版的 `unknown`。
+
+### 17.3 for_each：遍历逻辑只写一次
+
+```c
+static void for_each(const int *values, size_t count,
+                     value_callback callback, void *context)
+{
+    for (size_t i = 0; i < count; ++i) {
+        callback(values[i], context);
+    }
+}
+```
+
+对比 JS：
+
+```js
+function forEach(values, callback, context) {
+  for (const v of values) callback(v, context);
+}
+```
+
+### 17.4 回调一：求和
+
+```c
+static void add_to_total(int value, void *context)
+{
+    int *total = context;   // void * 转回 int *
+    *total += value;
+}
+```
+
+调用：`for_each(values, count, add_to_total, &total)` → 累加得到 20。
+
+### 17.5 回调二：打印大于阈值的元素
+
+```c
+static void print_if_greater(int value, void *context)
+{
+    int *threshold = context;
+    if (value > *threshold) {
+        printf("%d\n", value);
+    }
+}
+```
+
+调用：`for_each(values, count, print_if_greater, &threshold)`，阈值 5 时打印 6、8。
+
+### 17.6 核心：回调的价值
+
+遍历逻辑（`for_each`）只写一次，不同行为靠传入**不同的回调**实现。不要为每个需求复制一个遍历函数——那样就失去了函数指针的意义。
+
+### 17.7 一句话总结
+
+> `typedef` 定义函数指针类型（等价 TS 的 `type X = (...) => ...`），函数就能像参数一样传递和调用。`void *context` 用来给回调带上下文数据，复用"指针传递才能修改外部变量"的机制。
+
+---
+
+## 十八、预处理与宏（16_preprocessor.c）
+
+### 18.1 预处理是什么
+
+`#include`、`#define`、`#ifdef` 这些以 `#` 开头的都不是 C 语言本身，而是**预处理指令**。在真正编译前，由"预处理器"先做一遍**文本替换**，再交给编译器。
+
+### 18.2 函数式宏
+
+```c
+#define ARRAY_COUNT(array) (sizeof(array) / sizeof((array)[0]))
+```
+
+宏用起来像函数，但本质是**文本替换**。`ARRAY_COUNT(values)` 被替换成：
+
+```c
+(sizeof(values) / sizeof((values)[0]))
+// 整个数组大小 / 单个元素大小 = 元素个数
+```
+
+### 18.3 宏陷阱：不加括号
+
+```c
+#define SQUARE_BAD(x) x * x
+```
+
+`SQUARE_BAD(1 + 2)` 直接替换：
+
+```c
+1 + 2 * 1 + 2        // 没有括号
+= 1 + (2 * 1) + 2    // 乘号优先级高于加号
+= 5
+```
+
+所以输出是 5，不是 9。宏是**纯文本替换，不遵守函数调用语义**。
+
+### 18.4 正确写法：处处加括号
+
+```c
+#define SQUARE(x) ((x) * (x))
+```
+
+`SQUARE(1 + 2)` 替换成：
+
+```c
+((1 + 2) * (1 + 2)) = 3 * 3 = 9
+```
+
+给参数和整体都加括号就正确了。写宏的铁律：**参数和整体都加括号**。
+
+### 18.5 条件编译
+
+```c
+#ifdef DEBUG
+    printf("DEBUG 构建已开启\n");
+#else
+    printf("普通构建；可尝试 cc -DDEBUG ...\n");
+#endif
+```
+
+- `#ifdef DEBUG` → "如果定义了 `DEBUG` 宏"
+- `#else` → "否则"
+- `#endif` → 结束条件块
+
+预处理器根据宏是否定义，**只保留其中一段代码参与编译**，另一段直接删掉。
+
+验证：
+
+| 编译命令 | 最后一行输出 |
+|---------|-------------|
+| `gcc ... lessons/16_preprocessor.c` | `普通构建；...` |
+| `gcc ... -DDEBUG lessons/16_preprocessor.c` | `DEBUG 构建已开启` |
+
+### 18.6 条件编译的典型用途
+
+```c
+#ifdef DEBUG
+    printf("进入函数 foo，x=%d\n", x);  // 调试日志
+#endif
+```
+
+开发时加 `-DDEBUG` 打印调试信息；发布时去掉，调试代码被预处理器删掉，**不占运行时开销**。
+
+### 18.7 一句话总结
+
+> 预处理是编译前的文本替换阶段：`#define` 定义宏（务必处处加括号），`#ifdef/#else/#endif` 是条件编译，用 `-D宏名` 在编译时打开或关闭某段代码，常用于调试日志开关。

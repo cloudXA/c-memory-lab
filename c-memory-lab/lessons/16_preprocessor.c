@@ -22,3 +22,6 @@ int main(void)
     /* TRY: 用 cc -E lessons/16_preprocessor.c 查看预处理结果。 */
     return 0;
 }
+// 数组元素数=4
+// 错误宏 SQUARE_BAD(1 + 2)=5
+// 加括号后 SQUARE(1 + 2)=9
