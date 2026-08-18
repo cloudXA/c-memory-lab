@@ -3067,3 +3067,169 @@ extern int shared_counter; // 冗余，没意义
 ### 19.10 一句话总结
 
 > `extern` = "这个变量在别处定义，这里只是声明引用"，用于跨文件共享；全局变量前的 `static` = "只在当前文件可见"，用于跨文件隐藏。`int x;` 不赋值仍是"定义"（会分配内存），所以表达"仅声明"必须用 `extern`。全局变量的生命周期到程序结束，这是值能累加的原因。
+
+---
+
+## 二十、字符串、strlen 与 sizeof（19_ownership.c）
+
+### 20.1 `strlen(text)` 在做什么
+
+```c
+size_t length = strlen(text);
+```
+
+`strlen` 做的事：
+
+1. `text` 是指针，指向内存中某个地址
+2. 从这个地址开始**一个字符一个字符往后找**
+3. 直到遇到 `\0`（空字符，字符串结束标志）就停
+4. 返回 `\0` 之前的字符个数（**不含** `\0`）
+
+```text
+text 指针
+  ↓
+┌───┬───┬───┬───┬───┬───┐
+│ h │ e │ l │ l │ o │ \0│
+└───┴───┴───┴───┴───┴───┘
+  1   2   3   4   5   ↑ 遇到 \0 停
+
+strlen 返回 5（不含 \0）
+```
+
+两个关键点：
+
+- **运行时计算**：`strlen` 是运行时逐个字符扫描算出来的，字符串不自带"长度"字段
+- **依赖 `\0`**：如果那段内存没有 `\0`，`strlen` 会一直往后扫直到撞上 `\0`——这就是越界/未定义行为的来源
+
+### 20.2 `strlen` vs `sizeof`（指针 vs 数组）
+
+| 表达式 | 求什么 | 结果 |
+|--------|--------|------|
+| `strlen(text)` | 字符串**内容**长度（到 `\0`） | 运行时算，如 5 |
+| `sizeof(text)` | 指针变量**本身**大小 | 8（64 位） |
+| `sizeof(*text)` | 指向的 `char` 大小 | 1 |
+
+最关键的坑——区分 `text` 是数组还是指针：
+
+```c
+char text[] = "hello";   // 数组
+strlen(text);            // 5（内容长度）
+sizeof(text);            // 6（数组总大小，含 \0）
+
+char *p = "hello";       // 指针
+strlen(p);               // 5
+sizeof(p);               // 8（指针大小，跟内容无关！）
+```
+
+> 数组的 `sizeof` 是整个数组大小；指针的 `sizeof` 永远是 8（64 位），跟字符串多长没关系。
+
+---
+
+## 二十一、内存所有权（19_ownership.c）
+
+### 21.1 核心概念：所有权三件事
+
+```c
+struct Message {
+    char *text;  /* Message 拥有该动态字符串 */
+};
+```
+
+"**拥有**"是关键词。所有权 = **谁创建、谁使用、谁负责释放**。
+
+| 函数 | 职责 | 所有权动作 |
+|------|------|-----------|
+| `message_init` | 分配内存 | **创建**（malloc） |
+| 使用 | 打印 | **使用** |
+| `message_destroy` | 释放内存 | **销毁**（free） |
+
+### 21.2 创建：动态分配字符串的标准套路
+
+```c
+static int message_init(struct Message *message, const char *text)
+{
+    size_t length = strlen(text);              // 1. 算长度
+    message->text = malloc(length + 1U);       // 2. 分配内存（+1 给 \0）
+    if (message->text == NULL) return 0;       // 3. 检查分配失败
+    memcpy(message->text, text, length + 1U);  // 4. 复制内容（含 \0）
+    return 1;                                   // 5. 成功
+}
+```
+
+这 5 步是动态分配字符串的**固定套路**：
+
+1. `strlen` 算长度
+2. `malloc` 分配（`+1` 给结束符 `\0`）
+3. 判空（`malloc` 可能失败返回 `NULL`）
+4. `memcpy` 复制（比 `strcpy` 安全）
+5. 返回成功标志
+
+### 21.3 销毁：释放的标准套路
+
+```c
+static void message_destroy(struct Message *message)
+{
+    free(message->text);      // 释放动态内存
+    message->text = NULL;     // 防止悬空指针
+}
+```
+
+`free` 之后立刻置 `NULL`，避免误用。
+
+### 21.4 核心问题：浅拷贝（shallow copy）
+
+```c
+struct Message a;
+message_init(&a, "hello");   // a.text 指向堆内存 0x6000
+
+struct Message b = a;        // 直接复制整个 struct
+```
+
+`struct Message` 只有一个成员 `char *text`（指针），所以"复制 struct"只是**复制了指针的值**：
+
+```text
+a.text ──────┐
+             ├──> 堆内存 0x6000: "hello\0"
+b.text ──────┘
+```
+
+`a.text` 和 `b.text` 指向**同一块堆内存**，却是两个独立 struct。
+
+### 21.5 为什么这是问题
+
+一块内存，两个"主人"：
+
+```c
+message_destroy(&a);   // free 0x6000
+message_destroy(&b);   // 又 free 0x6000 → 双重释放（double free）！
+```
+
+- 两个都 free → **双重释放**，未定义行为，可能崩溃
+- 只 free 一个、另一个忘了 → **内存泄漏**
+- 另一个还指着已释放内存 → **悬空指针**
+
+```text
+free(a) 后：
+a.text ──> 0x6000 [已释放]
+b.text ──> 0x6000 [已释放]   ← b 还傻乎乎指着已释放的内存
+```
+
+### 21.6 正确做法：深拷贝（deep copy）
+
+真正复制内容，给新对象也分配独立内存：
+
+```c
+struct Message b;
+message_init(&b, a.text);   // b 自己 malloc 一块新内存
+```
+
+```text
+a.text ──> 0x6000 ["hello"]   （独立）
+b.text ──> 0x7000 ["hello"]   （独立，内容相同）
+```
+
+这样 `free(a)` 和 `free(b)` 各释放各的，互不影响。
+
+### 21.7 一句话总结
+
+> `struct Message` 里只有指针 `text`，直接 `b = a` 只是复制了指针（浅拷贝），导致两个对象指向同一块动态内存。两个对象都"拥有"这块内存，各自 free 就双重释放、只 free 一个就泄漏。要复制内容必须深拷贝（各自 malloc）。所有权 = 谁创建（malloc）、谁使用、谁释放（free）。

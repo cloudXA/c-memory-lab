@@ -28,7 +28,7 @@ int main(void)
 {
     const int values[] = {10, 20, 30};
     double result = 0.0;
-    enum AverageResult status = average(values, 3U, &result);
+    enum AverageResult status = average(values, 0U, &result);
 
     if (status != AVERAGE_OK) {
         fprintf(stderr, "average failed: %d\n", status);
@@ -39,3 +39,6 @@ int main(void)
     /* TRY: 分别传 NULL 和 count=0，验证调用者不会使用无效输出。 */
     return 0;
 }
+// average=20.00
+
+// average failed: 2
