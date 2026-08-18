@@ -3233,3 +3233,133 @@ b.text ──> 0x7000 ["hello"]   （独立，内容相同）
 ### 21.7 一句话总结
 
 > `struct Message` 里只有指针 `text`，直接 `b = a` 只是复制了指针（浅拷贝），导致两个对象指向同一块动态内存。两个对象都"拥有"这块内存，各自 free 就双重释放、只 free 一个就泄漏。要复制内容必须深拷贝（各自 malloc）。所有权 = 谁创建（malloc）、谁使用、谁释放（free）。
+
+---
+
+## 二十二、环形缓冲区（20_ring_buffer.c）
+
+### 22.1 结构与成员分工
+
+```c
+#define BUFFER_CAPACITY 4U
+
+struct RingBuffer {
+    uint8_t data[BUFFER_CAPACITY];  // 固定大小数组，循环复用
+    size_t head;                     // 写入位置指针
+    size_t tail;                     // 读取位置指针
+    size_t count;                    // 元素个数（判空/判满）
+};
+```
+
+| 成员 | 作用 | push 时 | pop 时 |
+|------|------|--------|--------|
+| `head` | 写入位置指针 | 写 `data[head]` 后 +1 | 不动 |
+| `tail` | 读取位置指针 | 不动 | 读 `data[tail]` 后 +1 |
+| `count` | 元素个数 | +1 | -1 |
+
+### 22.2 struct 大小（不是 32×4）
+
+- `data[4]` = `4 × sizeof(uint8_t)` = **4 字节**
+- 三个 `size_t` 各 8 字节，共 24 字节
+- 总大小 28，但 `size_t` 要 8 字节对齐，`data`（4 字节）后填 4 字节 → `sizeof` = **32 字节**
+
+```text
+偏移:  0    4    8         16        24
+     +----+----+---------+---------+---------+
+     |data|填充|  head   |  tail   |  count  |
+     +----+----+---------+---------+---------+
+      4    4     8         8         8
+```
+
+### 22.3 绕回机制：取模
+
+```c
+buffer->head = (buffer->head + 1U) % BUFFER_CAPACITY;
+```
+
+`head` 在 `0~3` 之间循环，到 3 后 +1 取模变 0，实现"环"：
+
+| 当前 head | `+1` | `% 4` | 新 head |
+|:---:|:---:|:---:|:---:|
+| 0 | 1 | 1 | 1 |
+| 3 | 4 | 0 | 0（绕回） |
+
+### 22.4 push 和 pop 只动指针，不改 data
+
+```c
+*out = buffer->data[buffer->tail];  // pop 只是"读取"，不清空 data
+```
+
+`pop` 不修改 `data` 数组，只移动 `tail` 和减 `count`。旧值留着没关系，下次 push 会覆盖。
+
+### 22.5 环形缓冲区为什么需要
+
+1. **复用固定内存**：一次分配，读写位置循环复用，避免频繁 malloc/free 和内存碎片
+2. **解耦生产者和消费者**：两边速度不一致时充当"蓄水池"
+3. **O(1) 高效**：push/pop 都只动指针，不搬移数据
+
+### 22.6 典型应用场景
+
+串口/UART 收发、音频流、网络包缓冲、键盘输入、日志系统——都是"一边生产一边消费"的高频场景。
+
+### 22.7 最佳实践：生产者/消费者分离
+
+工程里不是"push 一个就 pop 一个"，而是**两个独立角色各管各的节奏**：
+
+```c
+static void producer_task(struct RingBuffer *buffer, const uint8_t *data, size_t n)
+{
+    for (size_t i = 0; i < n; ++i) {
+        if (ring_push(buffer, data[i])) {
+            printf("producer push %u\n", (unsigned int)data[i]);
+        } else {
+            printf("producer push %u: full, dropped\n", (unsigned int)data[i]);
+        }
+    }
+}
+
+static void consumer_task(struct RingBuffer *buffer, size_t n)
+{
+    uint8_t value = 0U;
+    for (size_t i = 0; i < n; ++i) {
+        if (ring_pop(buffer, &value)) {
+            printf("consumer pop %u\n", (unsigned int)value);
+        } else {
+            printf("consumer pop: empty\n");
+        }
+    }
+}
+```
+
+### 22.8 中断 push、主循环 pop
+
+典型嵌入式模式：
+
+```
+串口中断（生产者）           主循环（消费者）
+   │ push                      │ pop
+   ▼                           ▼
+   ┌─────────────────────────────┐
+   │       环形缓冲区（卡槽）      │
+   └─────────────────────────────┘
+```
+
+- 中断来了一个字节 → 立即 `push`（中断里必须快，不能干耗时的事）
+- 主循环有空 → `pop` 出来慢慢处理
+- 中间"卡槽"吸收两边速度差
+
+### 22.9 满/空边界处理
+
+中断 push 太快、主循环 pop 太慢时，卡槽会满。满了的策略：
+
+| 策略 | 适用场景 |
+|------|---------|
+| 丢弃新数据（返回 false） | 数据可丢失，如传感器采样 |
+| 覆盖最旧数据 | 只关心最新值，如状态标志 |
+| 加锁/流控 | 数据不能丢，让生产者暂停 |
+
+> 注意：中断和主循环并发访问同一缓冲区时，还需处理并发安全（关中断、无锁结构等），这是进阶话题。
+
+### 22.10 一句话总结
+
+> 环形缓冲区用固定大小数组 + head/tail/count 三指针实现 FIFO 队列，靠取模让读写位置循环复用。核心价值是复用内存、解耦生产者和消费者（中断 push、主循环 pop）、O(1) 高效。最佳实践是分离 producer/consumer 角色，并显式处理满/空边界。
