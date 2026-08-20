@@ -30,3 +30,4 @@ int main(void)
     /* TRY: 解释 volatile 为何不提供原子性、互斥或线程安全。 */
     return 0;
 }
+// data=1234, control=0x8

@@ -1,7 +1,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
-static void encode_u16_be(uint16_t value, uint8_t out[2])
+static void encode_u16_be(uint16_t value, uint8_t *out)
 {
     out[0] = (uint8_t)(value >> 8U);
     out[1] = (uint8_t)(value & UINT16_C(0xff));
@@ -27,3 +27,6 @@ int main(void)
     /* TRY: 实现 uint32_t 的大端编码和解码。 */
     return 0;
 }
+// encoded: 12 34
+// decoded: 0x1234
+// 本机内存顺序: 12 34
