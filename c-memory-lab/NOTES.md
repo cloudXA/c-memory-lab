@@ -3488,3 +3488,83 @@ while (status == 0) { }   // 编译器可能优化成死循环！
 ### 23.9 一句话总结
 
 > volatile 只做一件事：禁止编译器优化对它的访问（每次都真读内存），用于硬件寄存器或信号处理。它不提供原子性、互斥、线程安全，线程同步要用 `_Atomic`、`mutex` 等专门工具，不能用 volatile 代替。
+
+---
+
+## 二十四、驱动接口与多态（24_driver_interface.c）
+
+### 24.1 函数指针类型 + 接口结构体
+
+```c
+typedef bool (*sensor_read_fn)(struct Sensor *sensor, float *temperature);
+
+struct Sensor {
+    sensor_read_fn read;   // 函数指针：抽象"读取"动作
+    void *context;         // 数据指针：具体实现所需的数据
+};
+```
+
+**关键纠正**：`sensor_read_fn` 是**类型别名**（typedef 起的名字），不是函数名。它表示"指向 `bool 函数(struct Sensor*, float*)` 的函数指针"。
+
+返回的是 `bool` **值**，不是"指向 bool 的指针"（那要写 `bool *(...)`）。
+
+### 24.2 结构体必须初始化才能安全使用
+
+结构体声明时可以不赋值（语法合法），但成员里是**垃圾值**。尤其这里 `read`（函数指针）和 `context`（数据指针）不初始化就是野指针，一调用就崩溃。
+
+规则：**声明可以裸声明，但使用前必须初始化**——要么声明时 `{...}` 初始化，要么声明后立刻逐成员赋值。
+
+### 24.3 为什么"绕来绕去"——C 模拟多态
+
+```c
+sensor->read(sensor, &temperature)
+```
+
+看起来"自己调自己的函数指针、还把自己传进去"，其实这是 C 补上"没有 this、没有方法"的缺口：
+
+| TS | C |
+|----|---|
+| `sensor.read()` | `sensor->read(sensor, ...)` |
+| `this` 自动 | 手动把 `sensor` 当第一个参数传 |
+| `implements` 接口 | 函数指针 `read` |
+| 类的字段 | `context` 指向的数据 |
+
+### 24.4 核心目的：接口与实现分离（面向接口编程）
+
+```c
+static void application_poll(struct Sensor *sensor)   // 上层代码，只依赖接口
+{
+    float temperature = 0.0F;
+    if (sensor->read(sensor, &temperature)) { ... }
+}
+```
+
+上层代码只依赖 `struct Sensor` 接口，不关心底层是假传感器还是真传感器。具体实现可替换，上层一行不改。
+
+### 24.5 多态 + 依赖注入
+
+```c
+struct FakeSensorData fake = {.next_value = 26.5F, .connected = true};
+struct Sensor sensor = {.read = fake_sensor_read, .context = &fake};
+
+struct RealSensorData real = {.adc_raw = UINT32_C(1230)};
+struct Sensor real_sensor = {.read = real_sensor_read, .context = &real};
+
+application_poll(&sensor);       // 假传感器 → 26.5
+application_poll(&real_sensor);  // 真传感器 → ADC 换算 30.0
+```
+
+同一个 `sensor->read(...)`，因为 `read` 指向不同函数，执行不同逻辑——多态。`read`/`context` 在 main 里运行时注入，不是写死。
+
+### 24.6 工程价值
+
+| 场景 | 好处 |
+|------|------|
+| 测试 | 用假驱动测上层逻辑，不用真硬件 |
+| 硬件未就绪 | 先用假驱动开发，硬件好了换真驱动 |
+| 多硬件 | 同一套上层代码适配不同型号 |
+| 解耦 | 上层和底层独立演进 |
+
+### 24.7 一句话总结
+
+> C 用"函数指针 read + 数据指针 context"手动实现面向对象的多态和依赖注入：上层代码只依赖 `struct Sensor` 接口，具体实现（假/真传感器）可运行时注入、随时替换，上层一行不改。价值在于解耦、可测试、可替换硬件。TS 里 `sensor.read()` 的 `this` 是自动的，C 里要手动传 `sensor` 当第一个参数。

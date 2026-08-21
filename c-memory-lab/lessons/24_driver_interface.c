@@ -1,4 +1,5 @@
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 
 struct Sensor;
@@ -15,6 +16,11 @@ struct FakeSensorData {
     bool connected;
 };
 
+/* ---- 第二个驱动实现：真实传感器（模拟 ADC 原始值换算） ---- */
+struct RealSensorData {
+    uint32_t adc_raw;      /* ADC 原始读数，假设 0~4095 对应 0~100 摄氏度 */
+};
+
 static bool fake_sensor_read(struct Sensor *sensor, float *temperature)
 {
     struct FakeSensorData *data = sensor->context;
@@ -22,6 +28,17 @@ static bool fake_sensor_read(struct Sensor *sensor, float *temperature)
         return false;
     }
     *temperature = data->next_value;
+    return true;
+}
+
+static bool real_sensor_read(struct Sensor *sensor, float *temperature)
+{
+    struct RealSensorData *data = sensor->context;
+    if (temperature == NULL) {
+        return false;
+    }
+    /* 换算：adc_raw / 4095.0 * 100.0 = 摄氏度 */
+    *temperature = (float)data->adc_raw / 4095.0F * 100.0F;
     return true;
 }
 
@@ -45,5 +62,13 @@ int main(void)
     application_poll(&sensor);
 
     /* TRY: 新增另一个驱动实现，不修改 application_poll。 */
+    struct RealSensorData real = {.adc_raw = UINT32_C(1230)};
+    struct Sensor real_sensor = {.read = real_sensor_read, .context = &real};
+
+    application_poll(&real_sensor);   /* 上层代码 application_poll 完全没改 */
+
     return 0;
 }
+// temperature=26.5F
+// sensor read failed
+
